@@ -1,0 +1,43 @@
+{
+  "name": "Oauth",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "oauth",
+  "workspaceFolder": "/app",
+  "shutdownAction": "stopCompose",
+
+  // Configure tool-specific properties.
+  "customizations": {
+    // Configure properties specific to VS Code.
+    "vscode": {
+      // Set *default* container specific settings.json values on container create.
+      "settings": {
+        "lldb.executable": "/usr/bin/lldb",
+        "files.watcherExclude": {
+          "**/target/**": true
+        },
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.serverPath": "/usr/local/bin/rust-analyzer",
+        "remote.extensionKind": {
+          "ms-azuretools.vscode-docker": ["ui"],
+          "rust-lang.rust-analyzer": ["workspace"]
+        }
+      },
+
+      // Add the IDs of extensions you want installed when the container is created.
+      "extensions": [
+        "vadimcn.vscode-lldb",
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens",
+        "usernamehw.errorlens",
+        "esbenp.prettier-vscode",
+        "mikestead.dotenv"
+      ]
+    }
+  }
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  // "forwardPorts": [8080, 3306]
+}
