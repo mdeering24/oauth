@@ -4,8 +4,12 @@ extern crate lazy_static;
 extern crate tera;
 
 use actix_web::{
+    error::InternalError,
     get,
-    http::header::{self, HeaderMap},
+    http::{
+        header::{self},
+        StatusCode,
+    },
     middleware, post, web, App, Error as WebError, HttpRequest, HttpResponse, HttpServer,
     Responder,
 };
@@ -58,10 +62,20 @@ async fn authorize(
     let client = Clients::find()
         .filter(clients::Column::Uuid.eq(request.client_id.clone()))
         .one(&db.conn)
-        .await
-        .unwrap(); //TODO: Handle bad db response
+        .await;
 
-    match client {
+    if let Err(err) = client {
+        //Learning purposes only. Don't do in prod situation.
+        return Err(WebError::from(InternalError::new(
+            err.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )));
+    }
+
+    match client.unwrap() {
+        None => {
+            Ok(HttpResponse::BadRequest().body(format!("Unknown client {}", request.client_id)))
+        }
         Some(client) => {
             if client.redirect_uri == request.redirect_uri {
                 //split scopes and compare to make sure all requested scopes are available
@@ -83,8 +97,13 @@ async fn authorize(
                     ..Default::default()
                 };
 
-                //TODO: Handle bad db response
-                let _db_resp = record.insert(&db.conn).await;
+                if let Err(err) = record.insert(&db.conn).await {
+                    //Learning purposes only. Don't do in prod situation.
+                    return Err(WebError::from(InternalError::new(
+                        err.to_string(),
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                    )));
+                }
 
                 let mut context = Context::new();
                 context.insert("client", &client);
@@ -115,9 +134,6 @@ async fn authorize(
                 )))
             }
         }
-        None => {
-            Ok(HttpResponse::BadRequest().body(format!("Unknown client {}", request.client_id)))
-        }
     }
 }
 
@@ -133,16 +149,20 @@ async fn approve(
     form: web::Form<ApproveForm>,
     db: web::Data<AppState>,
 ) -> Result<HttpResponse, WebError> {
-    // check request_id from recorded requests
-    println!("{:?} \n\n", form);
-
     let request = Requests::find()
         .filter(requests::Column::Uuid.eq(form.reqid.to_owned()))
         .one(&db.conn)
-        .await
-        .unwrap(); //TODO: Handle bad db response
+        .await;
 
-    match request {
+    if let Err(err) = request {
+        //Learning purposes only. Don't do in prod situation.
+        return Err(WebError::from(InternalError::new(
+            err.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )));
+    }
+
+    match request.unwrap() {
         None => Ok(HttpResponse::BadRequest().body("No matching authorization request")),
         Some(request) => {
             if !form.approve.eq("Approve") {
@@ -161,9 +181,7 @@ async fn approve(
                 if client.is_none() {
                     return Ok(HttpResponse::BadRequest().body("Request has no client"));
                 }
-                let client = client.unwrap();
 
-                //TODO: get scope from form body
                 let mut requested_scope = String::new();
                 if let Some(mut rscope) = form.scope.to_owned() {
                     let tmp = rscope
@@ -172,7 +190,7 @@ async fn approve(
                         .collect::<String>();
                     requested_scope.push_str(&tmp)
                 }
-                if !compare_scope_strings(&requested_scope, &client.scope) {
+                if !compare_scope_strings(&requested_scope, &client.unwrap().scope) {
                     return Ok(HttpResponse::BadRequest().body("invalid scope"));
                 }
 
@@ -188,8 +206,13 @@ async fn approve(
                     request.redirect_uri, code, request.csrf_token
                 );
 
-                let _new = code_record.insert(&db.conn).await;
-                //TODO: handle bad insert
+                if let Err(err) = code_record.insert(&db.conn).await {
+                    //Learning purposes only. Don't do in prod situation.
+                    return Err(WebError::from(InternalError::new(
+                        err.to_string(),
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                    )));
+                }
 
                 Ok(HttpResponse::Found()
                     .insert_header((header::LOCATION, redirect_uri.to_string()))
