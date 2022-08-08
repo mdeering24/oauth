@@ -6,7 +6,7 @@ services:
     volumes:
       - ../:/app:cached
     ports:
-      - 8080:8080
+      - 9001:9001
     networks:
       - oauth
     cap_add:
